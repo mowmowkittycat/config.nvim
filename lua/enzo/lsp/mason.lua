@@ -7,7 +7,6 @@ local servers = {
     "tsserver",
     "clangd",
     "rust_analyzer",
-    "luau_lsp",
 }
 
 local settings = {
@@ -27,44 +26,39 @@ local settings = {
 	max_concurrent_installers = 4,
 }
 
-require("mason-lspconfig").setup_handlers {
-  luau_lsp = function()
-    require("luau-lsp").setup {
-      server = { -- options passed to `require("lspconfig").luau_lsp.setup`
-        filetypes = { "lua", "luau" }, -- default is { "luau" }
-      },
-    }
-  end,
-}
 require("mason").setup(settings)
 require("mason-lspconfig").setup({
 	ensure_installed = servers,
 	automatic_installation = true,
 })
+function getOpts(server)
+    local opts = {
+        on_attach = require("enzo.lsp.handlers").on_attach,
+        capabilities = require("enzo.lsp.handlers").capabilities,
+    }
+    local require_ok, conf_opts = pcall(require, "enzo.lsp.settings." .. server)
+    if require_ok then
+        opts = vim.tbl_deep_extend("force", conf_opts, opts)
+    end
 
-local lspconfig_status_ok, lspconfig = pcall(require, "lspconfig")
-if not lspconfig_status_ok then
-	return
+    return opts
+
 end
+        
+require("mason-lspconfig").setup_handlers {
+    function(server)
+        require("lspconfig")[server].setup(getOpts(server))
+    end,
+    luau_lsp = function()
+         require("luau-lsp").setup {
+            on_attach = require("enzo.lsp.handlers").on_attach,
+            capabilities = require("enzo.lsp.handlers").capabilities,
+            server = { filetypes = { "lua", "luau" } }
+        }
+    
+    end,
+}
 
-local opts = {}
-
-
-for _, server in pairs(servers) do
-	opts = {
-		on_attach = require("enzo.lsp.handlers").on_attach,
-		capabilities = require("enzo.lsp.handlers").capabilities,
-	}
-
-	server = vim.split(server, "@")[1]
-
-	local require_ok, conf_opts = pcall(require, "enzo.lsp.settings." .. server)
-	if require_ok then
-		opts = vim.tbl_deep_extend("force", conf_opts, opts)
-	end
-
-	lspconfig[server].setup(opts)
-end
 
 
 -- Omnisharp/C#/Unity
